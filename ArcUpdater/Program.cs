@@ -21,17 +21,26 @@ namespace ArcUpdater
 
         private static int Update()
         {
+#if NET6_0_OR_GREATER
             DownloadClient downloadClient = new DownloadClient();
+#else
+            using DownloadClient downloadClient = new DownloadClient();
+#endif
+            using AssemblyUpdater updater = new AssemblyUpdater(downloadClient);
             AssemblyVerifier verifier = new AssemblyVerifier(downloadClient);
-            AssemblyUpdater updater = new AssemblyUpdater(downloadClient);
             UpdateOperation updateOperation = new UpdateOperation(verifier, updater, false);
             TargetPathOperation targetOperation = new TargetPathOperation(updateOperation, FileHelper.GetValidFilePaths);
-            bool success;
 
-            try { success = targetOperation.Execute(TargetPath.CurrentDirectory); }
-            catch { success = false; }
+            try 
+            { 
+                bool success = targetOperation.Execute(TargetPath.CurrentDirectory);
+                return ErrorCode.GetValue(success);
+            }
+            catch
+            {
+            }
 
-            return ErrorCode.GetValue(success);
+            return ErrorCode.Failure;
         }
     }
 }
