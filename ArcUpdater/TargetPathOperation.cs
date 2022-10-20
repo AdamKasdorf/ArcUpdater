@@ -91,7 +91,7 @@ namespace ArcUpdater
             {
                 if (_operation.TargetDirectoryFound(state))
                 {
-                    QueryTargetDirectory(state);
+                    return QueryTargetDirectory(state);
                 }
 
                 return false;
