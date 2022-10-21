@@ -7,7 +7,6 @@ namespace ArcUpdater
 {
     public class UpdateOperation : IFileSystemOperation
     {
-
         private readonly AssemblyVerifier _verifier;
         private readonly AssemblyUpdater _updater;
         private readonly bool _del;
@@ -206,7 +205,7 @@ namespace ArcUpdater
                 return true;
             }
 
-            if (_updater.TryLoadAssemblyFile())
+            if (_updater.TryLoadLocalAssemblyFile())
             {
                 if (_verifier.TryVerify(_updater.Assembly, out bool isValid) && isValid)
                 {

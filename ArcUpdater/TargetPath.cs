@@ -84,7 +84,7 @@ namespace ArcUpdater
                 if (!FileHelper.IsValidFileName(fileName))
                 {
                     throw new PathResolutionException(fullPath, "Invalid file name for assembly in path: " + fullPath + Environment.NewLine
-                        + "Valid names are 'd3d11.dll', 'dxgi.dll', and 'd3d9.dll' (deprecated).");
+                        + "Valid names are 'd3d11.dll', 'dxgi.dll', 'd3d9.dll' (deprecated), and 'gw2addon_arcdps.dll'.");
                 }
             }
 

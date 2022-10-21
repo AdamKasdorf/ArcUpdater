@@ -6,15 +6,24 @@
     <StartupObject>ArcUpdater.Program</StartupObject>
     <ApplicationIcon />
     <AllowUnsafeBlocks>False</AllowUnsafeBlocks>
-    <Platforms>AnyCPU;x64</Platforms>
+    <Platforms>x64;x86</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net6.0'">
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="7.0.0-rc.2.22472.3" />
-    <PackageReference Include="Microsoft.Extensions.Http" Version="7.0.0-rc.2.22472.3" />
-  </ItemGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
+    <DefineConstants>$(DefineConstants);X86</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x86' ">
+    <DefineConstants>$(DefineConstants);X86</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x64' ">
+    <DefineConstants>$(DefineConstants);X64</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
+    <DefineConstants>$(DefineConstants);X64</DefineConstants>
+  </PropertyGroup>
+  
   <ItemGroup>
-    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
     <PackageReference Include="System.CommandLine.NamingConventionBinder" Version="2.0.0-beta4.22272.1" />
   </ItemGroup>
 

@@ -15,6 +15,7 @@ namespace ArcUpdater
 
         public bool TargetDirectoryEmpty(FileSystemOperationState state)
         {
+            Console.WriteLine("No appropriately-named assemblies found in directory: " + state.FullPath);
             return true;
         }
 
@@ -25,6 +26,7 @@ namespace ArcUpdater
 
         public bool TargetDirectoryNotFound(FileSystemOperationState state)
         {
+            ConsoleHelper.WriteErrorLine("Could not find directory: " + state.FullPath);
             return true;
         }
 

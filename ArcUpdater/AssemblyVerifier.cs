@@ -7,17 +7,17 @@ namespace ArcUpdater
 {
     public class AssemblyVerifier
     {
-        private readonly DownloadClient _downloadClient;
+        private readonly HttpClient _client;
         private string _md5sum;
 
-        public AssemblyVerifier(DownloadClient downloadClient)
+        public AssemblyVerifier(HttpClient client)
         {
-            if (downloadClient == null)
+            if (client == null)
             {
-                throw new ArgumentNullException(nameof(downloadClient));
+                throw new ArgumentNullException(nameof(client));
             }
 
-            _downloadClient = downloadClient;
+            _client = client;
         }
 
         public bool ChecksumDownloaded
@@ -67,12 +67,13 @@ namespace ArcUpdater
         {
             try
             {
-                Task<byte[]> download = DownloadChecksum();
-
-                if (download.Wait(10000) && download.IsCompletedSuccessfully)
+                using (Task<byte[]> download = DownloadChecksum())
                 {
-                    _md5sum = Encoding.UTF8.GetString(download.Result, 0, 32);
-                    return true;
+                    if (download.Wait(10000) && download.IsCompletedSuccessfully)
+                    {
+                        _md5sum = Encoding.UTF8.GetString(download.Result, 0, 32);
+                        return true;
+                    }
                 }
             }
             catch
@@ -84,14 +85,12 @@ namespace ArcUpdater
         
         private async Task<byte[]> DownloadChecksum()
         {
-            using (HttpClient client = _downloadClient.Create())
-            {
-                const string MD5SumUrl = "https://www.deltaconnected.com/arcdps/x64/d3d11.dll.md5sum";
+            const string MD5SumUrl = "https://www.deltaconnected.com/arcdps/x64/d3d11.dll.md5sum";
 
-                using (HttpResponseMessage response = await client.GetAsync(MD5SumUrl, HttpCompletionOption.ResponseHeadersRead))
-                { 
-                    return await response.Content.ReadAsByteArrayAsync();
-                }
+            using (HttpResponseMessage response = await _client.GetAsync(MD5SumUrl, HttpCompletionOption.ResponseHeadersRead))
+            {
+                response.EnsureSuccessStatusCode();
+                return await response.Content.ReadAsByteArrayAsync();
             }
         }
     }

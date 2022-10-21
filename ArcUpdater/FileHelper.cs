@@ -8,7 +8,7 @@ namespace ArcUpdater
 {
     public static class FileHelper
     {
-        private static readonly string[] _validFileNames = { "d3d11.dll", "dxgi.dll", "d3d9.dll" };
+        private static readonly string[] _validFileNames = { "d3d11.dll", "dxgi.dll", "d3d9.dll", "gw2addon_arcdps.dll" };
 
         public static string[] ValidFileNames
         {
@@ -61,8 +61,10 @@ namespace ArcUpdater
         {
             try
             {
+
                 FileSystem.DeleteFile(filePath, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
                 return true;
+
             }
             catch
             {

@@ -102,11 +102,12 @@ namespace ArcUpdater
 
         private bool QueryTargetDirectory(FileSystemOperationState state)
         {
-            string[] filePaths;
+            List<string> filePaths;
 
             try
             {
-                filePaths = _targetDirectoryFileQuery(state.FullPath).ToArray();
+                // Forcing evaluation
+                filePaths = _targetDirectoryFileQuery(state.FullPath).ToList();
             }
             catch
             {

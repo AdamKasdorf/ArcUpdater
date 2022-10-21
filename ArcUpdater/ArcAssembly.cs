@@ -19,14 +19,28 @@ namespace ArcUpdater
             _stream = stream;
         }
 
+        ~ArcAssembly()
+        {
+            Dispose(false);
+        }
+
         public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
         {
             if (_disposed)
             {
                 return;
             }
 
-            _disposed = true;
+            if (disposing)
+            {
+                // managed resources
+            }
 
             if (_stream != null)
             {
@@ -34,7 +48,7 @@ namespace ArcUpdater
                 _stream = null;
             }
 
-            GC.SuppressFinalize(this);
+            _disposed = true;
         }
 
         public string ComputeChecksum()
@@ -44,13 +58,13 @@ namespace ArcUpdater
                 throw new ObjectDisposedException(nameof(ArcAssembly));
             }
 
-            _stream.Position = 0;
+            _stream.Seek(0, SeekOrigin.Begin);
 
             using (MD5 md5 = MD5.Create())
             {
                 byte[] hash = md5.ComputeHash(_stream);
 #if NET5_0_OR_GREATER
-                return Convert.ToHexString(hash).ToLowerInvariant();
+                return Convert.ToHexString(hash).ToLowerInvariant(); 
 #else
                 return BitConverter.ToString(hash).Replace("-", string.Empty).ToLowerInvariant();
 #endif
@@ -64,7 +78,7 @@ namespace ArcUpdater
                 throw new ObjectDisposedException(nameof(ArcAssembly));
             }
 
-            _stream.Position = 0;
+            _stream.Seek(0, SeekOrigin.Begin);
 
             using (FileStream file = File.Create(filePath))
             {

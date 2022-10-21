@@ -9,10 +9,6 @@ namespace ArcUpdater
     {
         private readonly AssemblyVerifier _verifier;
         
-        public VerifyOperation()
-        {
-        }
-
         public VerifyOperation(AssemblyVerifier verifier)
         {
             if (verifier == null)

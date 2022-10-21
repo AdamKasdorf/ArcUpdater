@@ -23,18 +23,23 @@ namespace ArcUpdater
             }
         }
 
-        private readonly DownloadClient _downloadClient;
+        private readonly HttpClient _client;
         private ArcAssembly _assembly;
         private bool _disposed;
 
-        public AssemblyUpdater(DownloadClient downloadClient)
+        public AssemblyUpdater(HttpClient client)
         {
-            if (downloadClient == null)
+            if (client == null)
             {
-                throw new ArgumentNullException(nameof(downloadClient));
+                throw new ArgumentNullException(nameof(client));
             }
 
-            _downloadClient = downloadClient;
+            _client = client;
+        }
+
+        ~AssemblyUpdater()
+        {
+            Dispose(false);
         }
 
         public bool AssemblyRetrieved
@@ -65,17 +70,28 @@ namespace ArcUpdater
 
         public void Dispose()
         {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
             if (_disposed)
             {
                 return;
             }
 
-            _disposed = true;
+            if (disposing)
+            {
+                // managed resources
+            }
+
             DisposeAssembly();
-            GC.SuppressFinalize(this);
+
+            _disposed = true;
         }
 
-        public bool TryLoadAssemblyFile()
+        public bool TryLoadLocalAssemblyFile()
         {
             if (_disposed)
             {
@@ -84,17 +100,17 @@ namespace ArcUpdater
 
             DisposeAssembly();
 
-            if (File.Exists(LocalAssemblyFilePath))
+            try
             {
-                try
+                if (File.Exists(LocalAssemblyFilePath))
                 {
                     FileStream fileStream = File.Open(LocalAssemblyFilePath, FileMode.Open, FileAccess.ReadWrite);
                     _assembly = new ArcAssembly(fileStream);
                     return true;
                 }
-                catch
-                {
-                }
+            }
+            catch
+            {
             }
 
             return false;
@@ -111,13 +127,14 @@ namespace ArcUpdater
 
             try
             {
-                Task download = DownloadAssembly(LocalAssemblyFilePath);
-
-                if (download.Wait(10000) && download.IsCompletedSuccessfully)
+                using (Task download = DownloadAssembly(LocalAssemblyFilePath))
                 {
-                    FileStream fileStream = File.Open(LocalAssemblyFilePath, FileMode.Open, FileAccess.ReadWrite);
-                    _assembly = new ArcAssembly(fileStream);
-                    return true;
+                    if (download.Wait(10000) && download.IsCompletedSuccessfully)
+                    {
+                        FileStream fileStream = File.Open(LocalAssemblyFilePath, FileMode.Open, FileAccess.ReadWrite);
+                        _assembly = new ArcAssembly(fileStream);
+                        return true;
+                    }
                 }
             }
             catch
@@ -129,21 +146,20 @@ namespace ArcUpdater
 
         private async Task DownloadAssembly(string destFilePath)
         {
-            using (HttpClient client = _downloadClient.Create())
+            const string AssemblyUrl = "https://www.deltaconnected.com/arcdps/x64/d3d11.dll";
+
+            using (HttpResponseMessage response = await _client.GetAsync(AssemblyUrl, HttpCompletionOption.ResponseHeadersRead))
             {
-                const string AssemblyUrl = "https://www.deltaconnected.com/arcdps/x64/d3d11.dll";
+                response.EnsureSuccessStatusCode();
 
-                using (HttpResponseMessage response = await client.GetAsync(AssemblyUrl, HttpCompletionOption.ResponseHeadersRead))
+                using (Stream responseStream = await response.Content.ReadAsStreamAsync())
                 {
-                    using (Stream responseStream = await response.Content.ReadAsStreamAsync())
-                    {
-                        string directory = Path.GetDirectoryName(destFilePath);
-                        Directory.CreateDirectory(directory);
+                    string directory = Path.GetDirectoryName(destFilePath);
+                    Directory.CreateDirectory(directory);
 
-                        using (FileStream file = File.Open(destFilePath, FileMode.Create))
-                        {
-                            await responseStream.CopyToAsync(file);
-                        }
+                    using (FileStream file = File.Open(destFilePath, FileMode.Create))
+                    {
+                        await responseStream.CopyToAsync(file);
                     }
                 }
             }

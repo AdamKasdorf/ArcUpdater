@@ -1,5 +1,7 @@
 ﻿using ArcUpdater.CommandLine;
 
+using System.Net.Http;
+
 namespace ArcUpdater
 {
     internal class Program
@@ -21,13 +23,9 @@ namespace ArcUpdater
 
         private static int Update()
         {
-#if NET6_0_OR_GREATER
-            DownloadClient downloadClient = new DownloadClient();
-#else
-            using DownloadClient downloadClient = new DownloadClient();
-#endif
-            using AssemblyUpdater updater = new AssemblyUpdater(downloadClient);
-            AssemblyVerifier verifier = new AssemblyVerifier(downloadClient);
+            using HttpClient client = new HttpClient();
+            using AssemblyUpdater updater = new AssemblyUpdater(client);
+            AssemblyVerifier verifier = new AssemblyVerifier(client);
             UpdateOperation updateOperation = new UpdateOperation(verifier, updater, false);
             TargetPathOperation targetOperation = new TargetPathOperation(updateOperation, FileHelper.GetValidFilePaths);
 
