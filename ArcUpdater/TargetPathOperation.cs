@@ -7,18 +7,37 @@ using System.Linq;
 
 namespace ArcUpdater
 {
+    /// <summary>
+    /// Represents a method used to query directories.
+    /// </summary>
+    /// <param name="path">The path of the directory to query.</param>
     public delegate IEnumerable<string> DirectoryQuery(string path);
 
+    /// <summary>
+    /// Represents an operation performed on target paths and files found in queried target directories.
+    /// </summary>
     public class TargetPathOperation
     {
         private readonly IFileSystemOperation _operation;
         private readonly DirectoryQuery _targetDirectoryFileQuery;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TargetPathOperation"/> class using the specified <paramref name="operation"/> and <see cref="Directory.EnumerateFiles"/> to query found directories.
+        /// </summary>
+        /// <param name="operation">The operation to perform.</param>
         public TargetPathOperation(IFileSystemOperation operation)
             : this(operation, null)
         {
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TargetPathOperation"/> class using the specified <paramref name="operation"/> and query delegate.
+        /// </summary>
+        /// <param name="operation">The operation to perform.</param>
+        /// <param name="targetDirectoryFileQuery">The delegate used to query found directories.</param>
+        /// <exception cref="ArgumentNullException">
+        /// The specified <paramref name="targetDirectoryFileQuery"/> is <see langword="null"/>.
+        /// </exception>
         public TargetPathOperation(IFileSystemOperation operation, DirectoryQuery targetDirectoryFileQuery)
         {
             if (operation == null)
@@ -30,6 +49,11 @@ namespace ArcUpdater
             _targetDirectoryFileQuery = targetDirectoryFileQuery ?? Directory.EnumerateFiles;
         }
 
+        /// <summary>
+        /// Executes the operation on the specified <paramref name="target"/>.
+        /// </summary>
+        /// <param name="target">The target of the operation.</param>
+        /// <returns><see langword="true"/> if the operation was successful; otherwise, <see langword="false"/>.</returns>
         public bool Execute(TargetPath target)
         {
             FileSystemOperationState state = new FileSystemOperationState(target.FullPath);
@@ -41,6 +65,11 @@ namespace ArcUpdater
             return TargetFile(state);
         }
 
+        /// <summary>
+        /// Executes the operation on the specified <paramref name="targets"/>.
+        /// </summary>
+        /// <param name="target">The targets of the operation.</param>
+        /// <returns><see langword="true"/> if the operation was successful; otherwise, <see langword="false"/>.</returns>
         public bool Execute(IEnumerable<TargetPath> targets)
         {
             bool success = true;
@@ -111,7 +140,7 @@ namespace ArcUpdater
             }
             catch
             {
-                ConsoleHelper.WriteErrorLine("Could not query files in directory: " + state.FullPath);
+                ConsoleHelper.WriteErrorLine("Could not perform directory query.");
                 return false;
             }
 
@@ -125,11 +154,11 @@ namespace ArcUpdater
                     if (File.Exists(filePath))
                     {
                         filesFound++;
-                        FileSystemOperationState subState = new FileSystemOperationState(filePath);
+                        FileSystemOperationState substate = new FileSystemOperationState(filePath);
 
-                        if (!_operation.FileFoundInTargetDirectory(subState))
+                        if (!_operation.FileFoundInTargetDirectory(substate))
                         {
-                            if (subState.Cancel)
+                            if (substate.Cancel)
                             {
                                 state.Cancel = true;
                                 return false;

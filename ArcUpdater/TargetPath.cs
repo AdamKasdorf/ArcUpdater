@@ -3,8 +3,14 @@ using System.IO;
 
 namespace ArcUpdater
 {
+    /// <summary>
+    /// Represents a fully-qualified path.
+    /// </summary>
     public class TargetPath
     {
+        /// <summary>
+        /// Gets a <see cref="TargetPath"/> that represents the current working directory.
+        /// </summary>
         public static TargetPath CurrentDirectory
         {
             get
@@ -27,6 +33,9 @@ namespace ArcUpdater
             _isDirectory = isDirectory;
         }
 
+        /// <summary>
+        /// Gets the fully-qualified path that this <see cref="TargetPath"/> represents.
+        /// </summary>
         public string FullPath
         {
             get
@@ -35,6 +44,9 @@ namespace ArcUpdater
             }
         }
 
+        /// <summary>
+        /// Gets a value that indicates whether the path that this <see cref="TargetPath"/> represents is a directory.
+        /// </summary>
         public bool IsDirectory
         {
             get
@@ -43,6 +55,19 @@ namespace ArcUpdater
             }
         }
 
+        /// <summary>
+        /// Resolves the fully-qualified path from the specified <paramref name="path"/>. Expands environment variables, 
+        /// appends '.dll' to valid file names that lack extensions when appropriate, and accepts paths relative to the current working directory.
+        /// </summary>
+        /// <param name="path">The path to resolve.</param>
+        /// <returns>A <see cref="TargetPath"/> that represents the fully-qualified path.</returns>
+        /// <exception cref="ArgumentNullException">
+        /// The specified <paramref name="path"/> is <see langword="null"/>.
+        /// </exception>
+        /// <exception cref="PathResolutionException">
+        /// The specified <paramref name="path"/> contains a character that is not allowed in path names 
+        /// or contains a file name that is not appropriate for an ArcDPS assembly.
+        /// </exception>
         public static TargetPath Resolve(string path)
         {
             if (path == null)
@@ -50,15 +75,21 @@ namespace ArcUpdater
                 throw new ArgumentNullException(nameof(path));
             }
 
-            string fullPath = Environment.ExpandEnvironmentVariables(path);
             bool isDirectory;
+            string fullPath = Environment.ExpandEnvironmentVariables(path);
 
-            if (TryFindFirstChar(fullPath, Path.GetInvalidPathChars(), out char invalidChar))
+            try
             {
-                throw new PathResolutionException(fullPath, "Invalid character '" + invalidChar + "' in path: " + fullPath);
+                fullPath = Path.GetFullPath(fullPath, Environment.CurrentDirectory);
+            }
+            catch (ArgumentException)
+            {
+                // At this point, fullPath cannot be null and Environment.CurrentDirectory is fully-qualified.
+                // GetFullPath should only throw ArgumentException if fullPath
+                // contains an invalid character defined in GetInvalidPathChars().
+                throw new PathResolutionException(fullPath, "Invalid character in path: " + fullPath);
             }
 
-            fullPath = Path.GetFullPath(fullPath, Environment.CurrentDirectory);
             string fileName = Path.GetFileName(fullPath);
 
             if (fileName == string.Empty || Directory.Exists(fullPath))
@@ -89,24 +120,6 @@ namespace ArcUpdater
             }
 
             return new TargetPath(fullPath, isDirectory);
-        }
-
-        private static bool TryFindFirstChar(string value, char[] chars, out char first)
-        {
-            for (int i = 0; i < value.Length; i++)
-            {
-                for (int c = 0; c < chars.Length; c++)
-                {
-                    if (value[i] == chars[c])
-                    {
-                        first = chars[c];
-                        return true;
-                    }
-                }
-            }
-
-            first = (char)0;
-            return false;
         }
     }
 }

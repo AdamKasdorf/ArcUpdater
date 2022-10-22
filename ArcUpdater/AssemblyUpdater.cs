@@ -42,6 +42,9 @@ namespace ArcUpdater
             Dispose(false);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
         public bool AssemblyRetrieved
         {
             get 
@@ -91,6 +94,36 @@ namespace ArcUpdater
             _disposed = true;
         }
 
+        private void DisposeAssembly()
+        {
+            if (_assembly != null)
+            {
+                _assembly.Dispose();
+                _assembly = null;
+            }
+        }
+
+        public bool TryWrite(string filePath)
+        {
+            if (AssemblyRetrieved)
+            {
+                try
+                {
+                    using (FileStream file = File.Create(filePath))
+                    {
+                        _assembly.CopyTo(file);
+                    }
+
+                    return true;
+                }
+                catch
+                {
+                }
+            }
+
+            return false;
+        }
+
         public bool TryLoadLocalAssemblyFile()
         {
             if (_disposed)
@@ -125,14 +158,22 @@ namespace ArcUpdater
 
             DisposeAssembly();
 
+            FileStream assemblyStream = null;
+
             try
             {
-                using (Task download = DownloadAssembly(LocalAssemblyFilePath))
+                // Creating new file with persistent backing stream that can be reused
+                // to verify integrity and then copy to a new location.
+                string path = LocalAssemblyFilePath;
+                string directory = Path.GetDirectoryName(path);
+                Directory.CreateDirectory(directory);
+                assemblyStream = File.Open(path, FileMode.Create, FileAccess.ReadWrite);
+
+                using (Task download = DownloadAssembly(assemblyStream))
                 {
                     if (download.Wait(10000) && download.IsCompletedSuccessfully)
                     {
-                        FileStream fileStream = File.Open(LocalAssemblyFilePath, FileMode.Open, FileAccess.ReadWrite);
-                        _assembly = new ArcAssembly(fileStream);
+                        _assembly = new ArcAssembly(assemblyStream);
                         return true;
                     }
                 }
@@ -141,53 +182,18 @@ namespace ArcUpdater
             {
             }
 
+            assemblyStream?.Dispose();
             return false;
         }
 
-        private async Task DownloadAssembly(string destFilePath)
+        private async Task DownloadAssembly(Stream assemblyStream)
         {
             const string AssemblyUrl = "https://www.deltaconnected.com/arcdps/x64/d3d11.dll";
 
             using (HttpResponseMessage response = await _client.GetAsync(AssemblyUrl, HttpCompletionOption.ResponseHeadersRead))
             {
                 response.EnsureSuccessStatusCode();
-
-                using (Stream responseStream = await response.Content.ReadAsStreamAsync())
-                {
-                    string directory = Path.GetDirectoryName(destFilePath);
-                    Directory.CreateDirectory(directory);
-
-                    using (FileStream file = File.Open(destFilePath, FileMode.Create))
-                    {
-                        await responseStream.CopyToAsync(file);
-                    }
-                }
-            }
-        }
-
-        public bool TryWrite(string filePath)
-        {
-            if (AssemblyRetrieved)
-            {
-                try
-                {
-                    _assembly.WriteToFile(filePath);
-                    return true;
-                }
-                catch
-                {
-                }
-            }
-
-            return false;
-        }
-
-        private void DisposeAssembly()
-        {
-            if (_assembly != null)
-            {
-                _assembly.Dispose();
-                _assembly = null;
+                await response.Content.CopyToAsync(assemblyStream);
             }
         }
     }

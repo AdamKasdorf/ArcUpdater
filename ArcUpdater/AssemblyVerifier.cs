@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Net.Http;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace ArcUpdater
@@ -65,13 +64,15 @@ namespace ArcUpdater
 
         public bool TryDownloadChecksum()
         {
+            const string MD5SumUrl = "https://www.deltaconnected.com/arcdps/x64/d3d11.dll.md5sum";
+
             try
             {
-                using (Task<byte[]> download = DownloadChecksum())
+                using (Task<string> download = _client.GetStringAsync(MD5SumUrl))
                 {
                     if (download.Wait(10000) && download.IsCompletedSuccessfully)
                     {
-                        _md5sum = Encoding.UTF8.GetString(download.Result, 0, 32);
+                        _md5sum = download.Result.Substring(0, 32);
                         return true;
                     }
                 }
@@ -81,17 +82,6 @@ namespace ArcUpdater
             }
 
             return false;
-        }
-        
-        private async Task<byte[]> DownloadChecksum()
-        {
-            const string MD5SumUrl = "https://www.deltaconnected.com/arcdps/x64/d3d11.dll.md5sum";
-
-            using (HttpResponseMessage response = await _client.GetAsync(MD5SumUrl, HttpCompletionOption.ResponseHeadersRead))
-            {
-                response.EnsureSuccessStatusCode();
-                return await response.Content.ReadAsByteArrayAsync();
-            }
         }
     }
 }

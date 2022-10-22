@@ -5,12 +5,24 @@ using System.IO;
 
 namespace ArcUpdater
 {
+    /// <summary>
+    /// Represents an operation to update or install ArcDPS assemblies.
+    /// </summary>
     public class UpdateOperation : IFileSystemOperation
     {
         private readonly AssemblyVerifier _verifier;
         private readonly AssemblyUpdater _updater;
         private readonly bool _del;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="UpdateOperation"/> class using the specified <paramref name="verifier"/>, <paramref name="updater"/>, and deletion behavior.
+        /// </summary>
+        /// <param name="verifier">The verifier to use to verify assemblies.</param>
+        /// <param name="updater">The updater to use to update assemblies.</param>
+        /// <param name="del">Indicates whether the operation should overwrite files rather than send them to the Recycle Bin.</param>
+        /// <exception cref="ArgumentNullException">
+        /// The specified <paramref name="verifier"/> or <paramref name="updater"/> is <see langword="null"/>.
+        /// </exception>
         public UpdateOperation(AssemblyVerifier verifier, AssemblyUpdater updater, bool del)
         {
             if (verifier == null)
@@ -89,17 +101,19 @@ namespace ArcUpdater
                 return false;
             }
 
-            if (WriteFile(state, false))
+            if (!EnsureLatestAssemblyRetrieved())
+            {
+                state.Cancel = true;
+                return false;
+            }
+
+            if (WriteFile(state.FullPath, false))
             {
                 Console.WriteLine("Assembly installed: " + state.FullPath);
                 return true;
             }
 
-            if (!state.Cancel)
-            {
-                ConsoleHelper.WriteFileAccessError("Could not install assembly to file path: " + state.FullPath);
-            }
-
+            ConsoleHelper.WriteFileAccessError("Could not install assembly to file path: " + state.FullPath);
             return false;
         }
 
@@ -142,30 +156,24 @@ namespace ArcUpdater
                 return true;
             }
 
-            if (WriteFile(state, !_del))
-            {
-                Console.WriteLine("Assembly updated: " + filePath);
-                return true;
-            }
-
-            if (!state.Cancel)
-            {
-                ConsoleHelper.WriteFileAccessError("Could not update asembly at file path: " + filePath);
-            }
-
-            return false;
-        }
-
-        private bool WriteFile(FileSystemOperationState state, bool recycleOldFile)
-        {
             if (!EnsureLatestAssemblyRetrieved())
             {
                 state.Cancel = true;
                 return false;
             }
 
-            string filePath = state.FullPath;
+            if (WriteFile(state.FullPath, !_del))
+            {
+                Console.WriteLine("Assembly updated: " + filePath);
+                return true;
+            }
 
+            ConsoleHelper.WriteFileAccessError("Could not update asembly at file path: " + filePath);
+            return false;
+        }
+
+        private bool WriteFile(string filePath, bool recycleOldFile)
+        {
             if (recycleOldFile)
             {
                 if (!FileHelper.TryRecycle(filePath))
@@ -177,7 +185,7 @@ namespace ArcUpdater
                 Console.WriteLine("Moved file to Recycle Bin: " + filePath);
             }
 
-            return _updater.TryWrite(state.FullPath);
+            return _updater.TryWrite(filePath);
         }
 
         private bool EnsureChecksumDownloaded()

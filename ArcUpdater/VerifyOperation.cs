@@ -5,10 +5,20 @@ using System.IO;
 
 namespace ArcUpdater
 {
+    /// <summary>
+    /// Represents an operation to verify the currentness and integrity of ArcDPS assemblies.
+    /// </summary>
     public class VerifyOperation : IFileSystemOperation
     {
         private readonly AssemblyVerifier _verifier;
         
+        /// <summary>
+        /// Initializes a new instance of the <see cref="VerifyOperation"/> class using the specified <paramref name="verifier"/>.
+        /// </summary>
+        /// <param name="verifier">The verifier to use to verify found assemblies.</param>
+        /// <exception cref="ArgumentNullException">
+        /// The specified <paramref name="verifier"/> is <see langword="null"/>.
+        /// </exception>
         public VerifyOperation(AssemblyVerifier verifier)
         {
             if (verifier == null)
