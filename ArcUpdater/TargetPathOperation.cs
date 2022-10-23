@@ -26,7 +26,7 @@ namespace ArcUpdater
         /// </summary>
         /// <param name="operation">The operation to perform.</param>
         public TargetPathOperation(IFileSystemOperation operation)
-            : this(operation, null)
+            : this(operation, Directory.EnumerateFiles)
         {
         }
 
@@ -36,7 +36,7 @@ namespace ArcUpdater
         /// <param name="operation">The operation to perform.</param>
         /// <param name="targetDirectoryFileQuery">The delegate used to query found directories.</param>
         /// <exception cref="ArgumentNullException">
-        /// The specified <paramref name="targetDirectoryFileQuery"/> is <see langword="null"/>.
+        /// The specified <paramref name="operation"/> or <paramref name="targetDirectoryFileQuery"/> is <see langword="null"/>.
         /// </exception>
         public TargetPathOperation(IFileSystemOperation operation, DirectoryQuery targetDirectoryFileQuery)
         {
@@ -44,56 +44,69 @@ namespace ArcUpdater
             {
                 throw new ArgumentNullException(nameof(operation));
             }
+
+            if (targetDirectoryFileQuery == null)
+            {
+                throw new ArgumentException(nameof(targetDirectoryFileQuery));
+            }
             
             _operation = operation;
-            _targetDirectoryFileQuery = targetDirectoryFileQuery ?? Directory.EnumerateFiles;
+            _targetDirectoryFileQuery = targetDirectoryFileQuery;
         }
 
         /// <summary>
-        /// Executes the operation on the specified <paramref name="target"/>.
+        /// Executes the operation on the specified <paramref name="target"/> using the specified behavior for repeats.
         /// </summary>
         /// <param name="target">The target of the operation.</param>
+        /// <param name="ignoreRepeats">Specifies that the operation should ignore repeat targets and queried files.</param>
         /// <returns><see langword="true"/> if the operation was successful; otherwise, <see langword="false"/>.</returns>
-        public bool Execute(TargetPath target)
+        public bool Execute(TargetPath target, bool ignoreRepeats = true)
         {
-            FileSystemOperationState state = new FileSystemOperationState(target.FullPath);
+            FileSystemOperationState opState = new FileSystemOperationState(target.FullPath);
 
             if (target.IsDirectory)
             {
-                return TargetDirectory(state);
+                return TargetDirectory(new ExecutionState(ignoreRepeats), opState);
             }
-            return TargetFile(state);
+            return TargetFile(opState);
         }
 
         /// <summary>
-        /// Executes the operation on the specified <paramref name="targets"/>.
+        /// Executes the operation on the specified <paramref name="targets"/> using the specified behavior for repeats.
         /// </summary>
         /// <param name="target">The targets of the operation.</param>
+        /// /// <param name="ignoreRepeats">Specifies that the operation should ignore repeat targets and queried files.</param>
         /// <returns><see langword="true"/> if the operation was successful; otherwise, <see langword="false"/>.</returns>
-        public bool Execute(IEnumerable<TargetPath> targets)
+        public bool Execute(IEnumerable<TargetPath> targets, bool ignoreRepeats = true)
         {
+            ExecutionState exState = new ExecutionState(ignoreRepeats);
             bool success = true;
 
             foreach (TargetPath target in targets)
             {
-                FileSystemOperationState state = new FileSystemOperationState(target.FullPath);
+                if (exState.ShouldIgnoreElseAdd(target.FullPath))
+                {
+                    continue;
+                }
+
+                FileSystemOperationState opState = new FileSystemOperationState(target.FullPath);
 
                 if (target.IsDirectory)
                 {
-                    if (!TargetDirectory(state))
+                    if (!TargetDirectory(exState, opState))
                     {
                         success = false;
                     }
                 }
                 else
                 {
-                    if (!TargetFile(state))
+                    if (!TargetFile(opState))
                     {
                         success = false;
                     }
                 }
 
-                if (state.Cancel)
+                if (opState.Cancel)
                 {
                     return false;
                 }
@@ -112,31 +125,31 @@ namespace ArcUpdater
             return _operation.TargetFileNotFound(state);
         }
 
-        private bool TargetDirectory(FileSystemOperationState state)
+        private bool TargetDirectory(ExecutionState exState, FileSystemOperationState opState)
         {
-            string path = state.FullPath;
+            string path = opState.FullPath;
 
             if (Directory.Exists(path))
             {
-                if (_operation.TargetDirectoryFound(state))
+                if (_operation.TargetDirectoryFound(opState))
                 {
-                    return QueryTargetDirectory(state);
+                    return QueryTargetDirectory(exState, opState);
                 }
 
                 return false;
             }
 
-            return _operation.TargetDirectoryNotFound(state);
+            return _operation.TargetDirectoryNotFound(opState);
         }
 
-        private bool QueryTargetDirectory(FileSystemOperationState state)
+        private bool QueryTargetDirectory(ExecutionState exState, FileSystemOperationState opState)
         {
             List<string> filePaths;
 
             try
             {
                 // Forcing evaluation
-                filePaths = _targetDirectoryFileQuery(state.FullPath).ToList();
+                filePaths = _targetDirectoryFileQuery(opState.FullPath).ToList();
             }
             catch
             {
@@ -147,35 +160,70 @@ namespace ArcUpdater
             int filesFound = 0;
             bool success = true;
 
-            if (filePaths != null)
+            foreach (string filePath in filePaths)
             {
-                foreach (string filePath in filePaths)
+                bool shouldIgnore = exState.ShouldIgnoreElseAdd(filePath);
+
+                if (File.Exists(filePath))
                 {
-                    if (File.Exists(filePath))
+                    filesFound++;
+
+                    if (shouldIgnore)
                     {
-                        filesFound++;
-                        FileSystemOperationState substate = new FileSystemOperationState(filePath);
+                        // Wait to continue until AFTER filesFound incremented
+                        // for expected TargetDirectoryEmpty behavior.
+                        continue;
+                    }
 
-                        if (!_operation.FileFoundInTargetDirectory(substate))
+                    FileSystemOperationState substate = new FileSystemOperationState(filePath);
+
+                    if (!_operation.FileFoundInTargetDirectory(substate))
+                    {
+                        if (substate.Cancel)
                         {
-                            if (substate.Cancel)
-                            {
-                                state.Cancel = true;
-                                return false;
-                            }
-
-                            success = false;
+                            opState.Cancel = true;
+                            return false;
                         }
+
+                        success = false;
                     }
                 }
             }
 
             if (filesFound == 0)
             {
-                return _operation.TargetDirectoryEmpty(state);
+                return _operation.TargetDirectoryEmpty(opState);
             }
 
             return success;
+        }
+
+        private class ExecutionState
+        {
+            private List<string> _repeats;
+
+            public ExecutionState(bool ignoreRepeats)
+            {
+                if (ignoreRepeats)
+                {
+                    _repeats = new List<string>();
+                }
+            }
+
+            public bool ShouldIgnoreElseAdd(string item)
+            {
+                if (_repeats != null)
+                {
+                    if (_repeats.Contains(item))
+                    {
+                        return true;
+                    }
+
+                    _repeats.Add(item);
+                }
+
+                return false;
+            }
         }
     }
 }
