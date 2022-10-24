@@ -5,11 +5,17 @@ using System.Threading.Tasks;
 
 namespace ArcUpdater
 {
+    /// <summary>
+    /// Provides methods for downloading, installing, and updating ArcDPS assemblies.
+    /// </summary>
     public class AssemblyUpdater : IDisposable
     {
         private static string CachedLocalAssemblyFilePath;
 
-        private static string LocalAssemblyFilePath
+        /// <summary>
+        /// Gets the fully-qualified file path at which a copy of the current assembly should be locally stored.
+        /// </summary>
+        public static string LocalAssemblyFilePath
         {
             get
             {
@@ -27,13 +33,18 @@ namespace ArcUpdater
         private ArcAssembly _assembly;
         private bool _disposed;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AssemblyUpdater"/> class using the specified download <paramref name="client"/>.
+        /// </summary>
+        /// <param name="client">The client used to download assemblies from the remote source.</param>
+        /// <exception cref="ArgumentNullException">The specified <paramref name="client"/> is <see langword="null"/>.</exception>
         public AssemblyUpdater(HttpClient client)
         {
             if (client == null)
             {
                 throw new ArgumentNullException(nameof(client));
             }
-
+            
             _client = client;
         }
 
@@ -43,8 +54,9 @@ namespace ArcUpdater
         }
 
         /// <summary>
-        /// 
+        /// Gets a value that indicates whether an assembly has been retrieved from either the local or remote source.
         /// </summary>
+        /// <exception cref="ObjectDisposedException"><see cref="Dispose"/> has been called on this <see cref="AssemblyUpdater"/>.</exception>
         public bool AssemblyRetrieved
         {
             get 
@@ -58,6 +70,10 @@ namespace ArcUpdater
             }
         }
 
+        /// <summary>
+        /// Gets the current assembly used to install or update files.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException"><see cref="Dispose"/> has been called on this <see cref="AssemblyUpdater"/>.</exception>
         public ArcAssembly Assembly
         {
             get
@@ -71,6 +87,9 @@ namespace ArcUpdater
             }
         }
 
+        /// <summary>
+        /// Releases all resources used by the retrieved assembly.
+        /// </summary>
         public void Dispose()
         {
             Dispose(true);
@@ -103,8 +122,19 @@ namespace ArcUpdater
             }
         }
 
-        public bool TryWrite(string filePath)
+        /// <summary>
+        /// Attempts to create or overwrite a file at the specified path and write the contents of the current assembly.
+        /// </summary>
+        /// <param name="filePath">The path and name of the file to create.</param>
+        /// <returns><see langword="true"/> if the operation succeeded; otherwise, <see langword="false"/>.</returns>
+        /// <exception cref="ObjectDisposedException"><see cref="Dispose"/> has been called on this <see cref="AssemblyUpdater"/>.</exception>
+        public bool TryCopyTo(string filePath)
         {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(AssemblyUpdater));
+            }
+
             if (AssemblyRetrieved)
             {
                 try
@@ -120,10 +150,15 @@ namespace ArcUpdater
                 {
                 }
             }
-
+            
             return false;
         }
 
+        /// <summary>
+        /// Attempts to open the locally-stored assembly file.
+        /// </summary>
+        /// <returns><see langword="true"/> if the file exists and was opened; otherwise, <see langword="false"/>.</returns>
+        /// <exception cref="ObjectDisposedException"><see cref="Dispose"/> has been called on this <see cref="AssemblyUpdater"/>.</exception>
         public bool TryLoadLocalAssemblyFile()
         {
             if (_disposed)
@@ -137,7 +172,7 @@ namespace ArcUpdater
             {
                 if (File.Exists(LocalAssemblyFilePath))
                 {
-                    FileStream fileStream = File.Open(LocalAssemblyFilePath, FileMode.Open, FileAccess.ReadWrite);
+                    FileStream fileStream = File.Open(LocalAssemblyFilePath, FileMode.Open, FileAccess.Read);
                     _assembly = new ArcAssembly(fileStream);
                     return true;
                 }
@@ -149,6 +184,11 @@ namespace ArcUpdater
             return false;
         }
 
+        /// <summary>
+        /// Attempts to download the most current assembly from the remote source.
+        /// </summary>
+        /// <returns><see langword="true"/> if the download was successful; otherwise, <see langword="false"/>.</returns>
+        /// <exception cref="ObjectDisposedException"><see cref="Dispose"/> has been called on this <see cref="AssemblyUpdater"/>.</exception>
         public bool TryDownloadAssembly()
         {
             if (_disposed)
@@ -159,7 +199,7 @@ namespace ArcUpdater
             DisposeAssembly();
 
             FileStream assemblyStream = null;
-
+            
             try
             {
                 // Creating new file with persistent backing stream that can be reused

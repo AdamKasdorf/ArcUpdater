@@ -4,6 +4,9 @@ using System.Security.Cryptography;
 
 namespace ArcUpdater
 {
+    /// <summary>
+    /// Encapsulates a backing <see cref="Stream"/> and provides methods to help verify and copy its contents.
+    /// </summary>
     public class ArcAssembly : IDisposable
     {
         private Stream _baseStream;
@@ -12,10 +15,8 @@ namespace ArcUpdater
         /// <summary>
         /// Initializes a new instance of the <see cref="ArcAssembly"/> class using the specified backing <paramref name="stream"/>.
         /// </summary>
-        /// <param name="stream">The underlying <see cref="Stream"/> object.</param>
-        /// <exception cref="ArgumentNullException">
-        /// The specified <paramref name="stream"/> is <see langword="null"/>.
-        /// </exception>
+        /// <param name="stream">The underlying stream.</param>
+        /// <exception cref="ArgumentNullException">The specified <paramref name="stream"/> is <see langword="null"/>.</exception>
         public ArcAssembly(Stream stream)
         {
             if (stream == null)
@@ -32,7 +33,7 @@ namespace ArcUpdater
         }
 
         /// <summary>
-        /// Releases all resources used by the underlying <see cref="Stream"/>.
+        /// Releases all resources used by the underlying stream.
         /// </summary>
         public void Dispose()
         {
@@ -61,6 +62,11 @@ namespace ArcUpdater
             _disposed = true;
         }
 
+        /// <summary>
+        /// Computes the MD5 hash of the underlying stream.
+        /// </summary>
+        /// <returns>The unformatted, lowercase, hexadecimal representation of the MD5 hash.</returns>
+        /// <exception cref="ObjectDisposedException">The underlying stream is closed.</exception>
         public string ComputeChecksum()
         {
             if (_disposed)
@@ -68,6 +74,7 @@ namespace ArcUpdater
                 throw new ObjectDisposedException(nameof(ArcAssembly));
             }
 
+            // Must reset position for proper ComputeHash result for downloaded stream.
             _baseStream.Seek(0, SeekOrigin.Begin);
 
             using (MD5 md5 = MD5.Create())
@@ -81,15 +88,21 @@ namespace ArcUpdater
             }
         }
 
-        public void CopyTo(Stream stream)
+        /// <summary>
+        /// Reads the bytes of the underlying stream and writes them to the specified <paramref name="destination"/> stream.
+        /// </summary>
+        /// <param name="destination">The stream to which the contents of the underlying stream will be copied.</param>
+        /// <exception cref="ObjectDisposedException">The underlying stream is closed.</exception>
+        public void CopyTo(Stream destination)
         {
             if (_disposed)
             {
                 throw new ObjectDisposedException(nameof(ArcAssembly));
             }
 
+            // Must reset position before copying.
             _baseStream.Seek(0, SeekOrigin.Begin);
-            _baseStream.CopyTo(stream);
+            _baseStream.CopyTo(destination);
         }
     }
 }

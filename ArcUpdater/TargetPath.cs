@@ -45,7 +45,7 @@ namespace ArcUpdater
         }
 
         /// <summary>
-        /// Gets a value that indicates whether the path that this <see cref="TargetPath"/> represents is a directory.
+        /// Gets a value that indicates whether the path that this <see cref="TargetPath"/> represents should be treated as a directory.
         /// </summary>
         public bool IsDirectory
         {
@@ -56,8 +56,8 @@ namespace ArcUpdater
         }
 
         /// <summary>
-        /// Resolves the fully-qualified path from the specified <paramref name="path"/>. Expands environment variables, 
-        /// appends '.dll' to valid file names that lack extensions when appropriate, and accepts paths relative to the current working directory.
+        /// Resolves the fully-qualified path from the specified <paramref name="path"/>.<br/>
+        /// Expands environment variables, appends '.dll' to valid file names that lack extensions when appropriate, and accepts paths relative to the current working directory.
         /// </summary>
         /// <param name="path">The path to resolve.</param>
         /// <returns>A <see cref="TargetPath"/> that represents the fully-qualified path.</returns>

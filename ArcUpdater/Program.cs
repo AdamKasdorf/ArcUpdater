@@ -1,11 +1,13 @@
 ﻿using ArcUpdater.CommandLine;
 
+using System;
 using System.Net.Http;
 
 namespace ArcUpdater
 {
     internal class Program
     {
+        [STAThread]
         static int Main(string[] args)
         {
             if (args.Length == 0)
@@ -26,19 +28,12 @@ namespace ArcUpdater
             using HttpClient client = new HttpClient();
             using AssemblyUpdater updater = new AssemblyUpdater(client);
             AssemblyVerifier verifier = new AssemblyVerifier(client);
+
             UpdateOperation updateOperation = new UpdateOperation(verifier, updater, false);
             TargetPathOperation targetOperation = new TargetPathOperation(updateOperation, FileHelper.GetValidFilePaths);
+            bool success = targetOperation.Execute(TargetPath.CurrentDirectory);
 
-            try 
-            { 
-                bool success = targetOperation.Execute(TargetPath.CurrentDirectory);
-                return ErrorCode.GetValue(success);
-            }
-            catch
-            {
-            }
-
-            return ErrorCode.Failure;
+            return ErrorCode.GetValue(success);
         }
     }
 }

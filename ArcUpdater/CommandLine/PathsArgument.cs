@@ -68,17 +68,17 @@ namespace ArcUpdater.CommandLine
             return false;
         }
 
-        private static void AddIfUnique(List<TargetPath> paths, TargetPath path)
+        private static void AddIfUnique(List<TargetPath> targets, TargetPath newTarget)
         {
-            for (int i = 0; i < paths.Count; i++)
+            for (int i = 0; i < targets.Count; i++)
             {
-                if (path.FullPath == paths[i].FullPath)
+                if (newTarget.FullPath == targets[i].FullPath)
                 {
                     return;
                 }
             }
 
-            paths.Add(path);
+            targets.Add(newTarget);
         }
     }
 }

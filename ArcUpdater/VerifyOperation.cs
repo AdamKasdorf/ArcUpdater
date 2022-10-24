@@ -53,7 +53,7 @@ namespace ArcUpdater
 
         public bool TargetFileNotFound(FileSystemOperationState state)
         {
-            ConsoleHelper.WriteErrorLine("Could not find file at path: " + state.FullPath);
+            ConsoleHelper.WriteErrorLine("Could not find file: " + state.FullPath);
             return false;
         }
 
@@ -82,11 +82,11 @@ namespace ArcUpdater
                 {
                     if (isValid)
                     {
-                        Console.WriteLine("Assembly is current at file path: " + filePath);
+                        Console.WriteLine("Assembly is current: " + filePath);
                     }
                     else
                     {
-                        Console.WriteLine("Assembly is outdated or corrupt at file path: " + filePath);
+                        Console.WriteLine("Assembly is outdated or corrupt: " + filePath);
                     }
 
                     return true;
@@ -97,7 +97,7 @@ namespace ArcUpdater
             }
 
             // TryVerify failed (returned false) or an exception was thrown.
-            ConsoleHelper.WriteFileAccessError("Could not verify assembly at file path: " + filePath);
+            ConsoleHelper.WriteFileAccessError("Could not verify assembly: " + filePath);
             return false;
         }
     }

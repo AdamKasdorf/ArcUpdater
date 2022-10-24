@@ -80,28 +80,14 @@ namespace ArcUpdater
         private bool InstallToTargetDirectory(FileSystemOperationState state)
         {
             string filePath = Path.Combine(state.FullPath, "d3d11.dll");
-            FileSystemOperationState subState = new FileSystemOperationState(filePath);
-            bool success = InstallFile(subState);
-            
-            if (subState.Cancel)
-            {
-                state.Cancel = true;
-            }
-
-            return success;
+            return InstallFile( state.Derive(filePath) );
         }
 
         private bool InstallFile(FileSystemOperationState state)
         {
             // This method assumes the file does not already exists.
 
-            if (!EnsureChecksumDownloaded())
-            {
-                state.Cancel = true;
-                return false;
-            }
-
-            if (!EnsureLatestAssemblyRetrieved())
+            if ( !(EnsureChecksumDownloaded() && EnsureLatestAssemblyRetrieved()) )
             {
                 state.Cancel = true;
                 return false;
@@ -113,7 +99,7 @@ namespace ArcUpdater
                 return true;
             }
 
-            ConsoleHelper.WriteFileAccessError("Could not install assembly to file path: " + state.FullPath);
+            ConsoleHelper.WriteFileAccessError("Could not install assembly: " + state.FullPath);
             return false;
         }
 
@@ -146,13 +132,13 @@ namespace ArcUpdater
 
             if (!couldVerify)
             {
-                ConsoleHelper.WriteFileAccessError("Could not verify assembly at file path: " + filePath);
+                ConsoleHelper.WriteFileAccessError("Could not verify assembly: " + filePath);
                 return false;
             }
 
             if (isValid)
             {
-                Console.WriteLine("Assembly is current at file path: " + filePath);
+                Console.WriteLine("Assembly is current: " + filePath);
                 return true;
             }
 
@@ -168,34 +154,26 @@ namespace ArcUpdater
                 return true;
             }
 
-            ConsoleHelper.WriteFileAccessError("Could not update asembly at file path: " + filePath);
+            ConsoleHelper.WriteFileAccessError("Could not update asembly: " + filePath);
             return false;
         }
 
         private bool WriteFile(string filePath, bool recycleOldFile)
         {
-            if (recycleOldFile)
-            {
-                if (!FileHelper.TryRecycle(filePath))
-                {
-                    ConsoleHelper.WriteFileAccessError("Could not move file to Recycle Bin: " + filePath);
-                    return false;
-                }
+            // No need for messages here, since this will necessarily be followed
+            // messages indicating success or failure of the install/update.
 
-                Console.WriteLine("Moved file to Recycle Bin: " + filePath);
+            if (recycleOldFile && !FileHelper.TryRecycle(filePath))
+            {
+                return false;
             }
 
-            return _updater.TryWrite(filePath);
+            return _updater.TryCopyTo(filePath);
         }
 
         private bool EnsureChecksumDownloaded()
         {
-            if (_verifier.ChecksumDownloaded)
-            {
-                return true;
-            }
-
-            if (_verifier.TryDownloadChecksum())
+            if (_verifier.ChecksumDownloaded || _verifier.TryDownloadChecksum())
             {
                 return true;
             }
