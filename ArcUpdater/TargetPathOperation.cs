@@ -62,13 +62,14 @@ namespace ArcUpdater
         /// <returns><see langword="true"/> if the operation was successful; otherwise, <see langword="false"/>.</returns>
         public bool Execute(TargetPath target, bool ignoreRepeats = true)
         {
-            FileSystemOperationState opState = new FileSystemOperationState(target.FullPath);
+            FileSystemOperationState state = new FileSystemOperationState(target.FullPath, ignoreRepeats);
 
             if (target.IsDirectory)
             {
-                return TargetDirectory(new ExecutionState(ignoreRepeats), opState);
+                return TargetDirectory(state);
             }
-            return TargetFile(opState);
+
+            return TargetFile(state);
         }
 
         /// <summary>
@@ -79,34 +80,34 @@ namespace ArcUpdater
         /// <returns><see langword="true"/> if the operation was successful; otherwise, <see langword="false"/>.</returns>
         public bool Execute(IEnumerable<TargetPath> targets, bool ignoreRepeats = true)
         {
-            ExecutionState exState = new ExecutionState(ignoreRepeats);
+            FileSystemOperationState state = new FileSystemOperationState(null, ignoreRepeats);
             bool success = true;
 
             foreach (TargetPath target in targets)
             {
-                if (exState.ShouldIgnoreElseAdd(target.FullPath))
+                FileSystemOperationState substate = state.Derive(target.FullPath);
+
+                if (substate.CheckIgnoreAndAdd())
                 {
                     continue;
                 }
 
-                FileSystemOperationState opState = new FileSystemOperationState(target.FullPath);
-
                 if (target.IsDirectory)
                 {
-                    if (!TargetDirectory(exState, opState))
+                    if (!TargetDirectory(substate))
                     {
                         success = false;
                     }
                 }
                 else
                 {
-                    if (!TargetFile(opState))
+                    if (!TargetFile(substate))
                     {
                         success = false;
                     }
                 }
 
-                if (opState.Cancel)
+                if (state.Cancel)
                 {
                     return false;
                 }
@@ -125,35 +126,35 @@ namespace ArcUpdater
             return _operation.TargetFileNotFound(state);
         }
 
-        private bool TargetDirectory(ExecutionState exState, FileSystemOperationState opState)
+        private bool TargetDirectory(FileSystemOperationState state)
         {
-            string path = opState.FullPath;
+            string path = state.FullPath;
 
             if (Directory.Exists(path))
             {
-                if (_operation.TargetDirectoryFound(opState))
+                if (_operation.TargetDirectoryFound(state))
                 {
-                    return QueryTargetDirectory(exState, opState);
+                    return QueryTargetDirectory(state);
                 }
 
                 return false;
             }
 
-            return _operation.TargetDirectoryNotFound(opState);
+            return _operation.TargetDirectoryNotFound(state);
         }
 
-        private bool QueryTargetDirectory(ExecutionState exState, FileSystemOperationState opState)
+        private bool QueryTargetDirectory(FileSystemOperationState state)
         {
             List<string> filePaths;
 
             try
             {
                 // Forcing evaluation
-                filePaths = _targetDirectoryFileQuery(opState.FullPath).ToList();
+                filePaths = _targetDirectoryFileQuery(state.FullPath).ToList();
             }
             catch
             {
-                ConsoleHelper.WriteErrorLine("Could not perform directory query.");
+                ConsoleHelper.WriteErrorLine("Could not perform query on directory: " + state.FullPath);
                 return false;
             }
 
@@ -162,7 +163,8 @@ namespace ArcUpdater
 
             foreach (string filePath in filePaths)
             {
-                bool shouldIgnore = exState.ShouldIgnoreElseAdd(filePath);
+                FileSystemOperationState substate = state.Derive(filePath);
+                bool shouldIgnore = substate.CheckIgnoreAndAdd();
 
                 if (File.Exists(filePath))
                 {
@@ -175,13 +177,10 @@ namespace ArcUpdater
                         continue;
                     }
 
-                    FileSystemOperationState substate = new FileSystemOperationState(filePath);
-
                     if (!_operation.FileFoundInTargetDirectory(substate))
                     {
                         if (substate.Cancel)
                         {
-                            opState.Cancel = true;
                             return false;
                         }
 
@@ -192,38 +191,10 @@ namespace ArcUpdater
 
             if (filesFound == 0)
             {
-                return _operation.TargetDirectoryEmpty(opState);
+                return _operation.TargetDirectoryEmpty(state);
             }
 
             return success;
-        }
-
-        private class ExecutionState
-        {
-            private List<string> _repeats;
-
-            public ExecutionState(bool ignoreRepeats)
-            {
-                if (ignoreRepeats)
-                {
-                    _repeats = new List<string>();
-                }
-            }
-
-            public bool ShouldIgnoreElseAdd(string item)
-            {
-                if (_repeats != null)
-                {
-                    if (_repeats.Contains(item))
-                    {
-                        return true;
-                    }
-
-                    _repeats.Add(item);
-                }
-
-                return false;
-            }
         }
     }
 }
