@@ -39,7 +39,7 @@ namespace ArcUpdater
         }
 
         /// <summary>
-        /// Attempts to verify the specified <paramref name="assembly"/>.
+        /// Verifies the currentness and integrity of the specified <paramref name="assembly"/>. A return value indicates whether the verification was successful.
         /// </summary>
         /// <param name="assembly">The assembly to verify.</param>
         /// <param name="result"><see langword="true"/> if the aseembly is current and not corrupt; otherwise, <see langword="false"/>.</param>
@@ -50,24 +50,7 @@ namespace ArcUpdater
             {
                 try
                 {
-                    string fileSum = assembly.ComputeChecksum();
-
-                    if (fileSum.Length != _md5sum.Length)
-                    {
-                        result = false;
-                        return true;
-                    }
-
-                    for (int i = 0; i < _md5sum.Length; i++)
-                    {
-                        if (fileSum[i] != _md5sum[i])
-                        {
-                            result = false;
-                            return true;
-                        }
-                    }
-
-                    result = true;
+                    result = (_md5sum == assembly.ComputeChecksum());
                     return true;
                 }
                 catch
@@ -80,7 +63,7 @@ namespace ArcUpdater
         }
 
         /// <summary>
-        /// Attempts to download the current md5sum file from the remote source.
+        /// Downloads the most current md5sum file from the remote source. A return value indicates whether the download was successful.
         /// </summary>
         /// <returns><see langword="true"/> if the download was successful; otherwise, <see langword="false"/>.</returns>
         public bool TryDownloadChecksum()

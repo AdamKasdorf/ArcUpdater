@@ -10,19 +10,28 @@ namespace ArcUpdater
     /// </summary>
     public class AssemblyUpdater : IDisposable
     {
+        private static bool AttemptedResolveLocalPath;
         private static string CachedLocalAssemblyFilePath;
 
         /// <summary>
-        /// Gets the fully-qualified file path at which a copy of the current assembly should be locally stored.
+        /// Gets the fully-qualified file path at which a copy of the current assembly should be locally stored. Returns <see langword="null"/> if could not be determined.
         /// </summary>
         public static string LocalAssemblyFilePath
         {
             get
             {
-                if (CachedLocalAssemblyFilePath == null)
+                if (!AttemptedResolveLocalPath)
                 {
-                    string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-                    CachedLocalAssemblyFilePath = Path.Combine(localAppData, "ArcUpdater", "d3d11.dll");
+                    try 
+                    { 
+                        string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                        CachedLocalAssemblyFilePath = Path.Combine(localAppData, "ArcUpdater", "d3d11.dll");
+                    }
+                    catch
+                    {
+                    }
+
+                    AttemptedResolveLocalPath = true;
                 }
 
                 return CachedLocalAssemblyFilePath;
@@ -123,28 +132,21 @@ namespace ArcUpdater
         }
 
         /// <summary>
-        /// Attempts to create or overwrite a file at the specified path and write the contents of the current assembly.
+        /// Creates or overwrites a file at the specified path and writes to it the contents of the currently retrieved assembly. A return value indicates whether the file write operation succeeded.
         /// </summary>
         /// <param name="filePath">The path and name of the file to create.</param>
-        /// <returns><see langword="true"/> if the operation succeeded; otherwise, <see langword="false"/>.</returns>
-        /// <exception cref="ObjectDisposedException"><see cref="Dispose"/> has been called on this <see cref="AssemblyUpdater"/>.</exception>
+        /// <returns><see langword="true"/> if the file was written successfully; otherwise, <see langword="false"/>.</returns>
         public bool TryCopyTo(string filePath)
         {
-            if (_disposed)
-            {
-                throw new ObjectDisposedException(nameof(AssemblyUpdater));
-            }
-
-            if (AssemblyRetrieved)
+            if (_assembly != null)
             {
                 try
                 {
                     using (FileStream file = File.Create(filePath))
                     {
                         _assembly.CopyTo(file);
+                        return true;
                     }
-
-                    return true;
                 }
                 catch
                 {
@@ -155,61 +157,72 @@ namespace ArcUpdater
         }
 
         /// <summary>
-        /// Attempts to open the locally-stored assembly file.
+        /// Opens the local assembly file to be stored as the currently retrieved assembly. A return value indicates whether the file exists and was opened.
         /// </summary>
         /// <returns><see langword="true"/> if the file exists and was opened; otherwise, <see langword="false"/>.</returns>
-        /// <exception cref="ObjectDisposedException"><see cref="Dispose"/> has been called on this <see cref="AssemblyUpdater"/>.</exception>
         public bool TryLoadLocalAssemblyFile()
         {
-            if (_disposed)
+            if (!_disposed)
             {
-                throw new ObjectDisposedException(nameof(AssemblyUpdater));
-            }
+                DisposeAssembly();
 
-            DisposeAssembly();
-
-            try
-            {
-                if (File.Exists(LocalAssemblyFilePath))
+                if (LocalAssemblyFilePath != null && File.Exists(LocalAssemblyFilePath))
                 {
-                    FileStream fileStream = File.Open(LocalAssemblyFilePath, FileMode.Open, FileAccess.Read);
-                    _assembly = new ArcAssembly(fileStream);
-                    return true;
+                    try
+                    {
+                        FileStream fileStream = File.Open(LocalAssemblyFilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                        _assembly = new ArcAssembly(fileStream);
+                        return true;
+                    }
+                    catch
+                    {
+                    }
                 }
-            }
-            catch
-            {
             }
 
             return false;
         }
 
         /// <summary>
-        /// Attempts to download the most current assembly from the remote source.
+        /// Downloads the most current assembly from the remote source to be stored as the currently retrieved assembly. A return value indicates whether the download succeeded.
         /// </summary>
         /// <returns><see langword="true"/> if the download was successful; otherwise, <see langword="false"/>.</returns>
-        /// <exception cref="ObjectDisposedException"><see cref="Dispose"/> has been called on this <see cref="AssemblyUpdater"/>.</exception>
         public bool TryDownloadAssembly()
         {
             if (_disposed)
             {
-                throw new ObjectDisposedException(nameof(AssemblyUpdater));
+                return false;
             }
 
             DisposeAssembly();
 
-            FileStream assemblyStream = null;
-            
+            string path = LocalAssemblyFilePath;
+            Stream assemblyStream = null;
+
+            if (path != null)
+            {
+                try
+                {
+                    string directory = Path.GetDirectoryName(path);
+                    Directory.CreateDirectory(directory);
+                    assemblyStream = File.Open(path, FileMode.Create, FileAccess.ReadWrite, FileShare.Read);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e.Message);
+                }
+            }
+
+            if (assemblyStream == null)
+            {
+                // Allows the download to be stored in temporary memory
+                // even if local directory/file could not be created.
+                assemblyStream = new MemoryStream();
+            }
+
             try
             {
-                // Creating new file with persistent backing stream that can be reused
-                // to verify integrity and then copy to a new location.
-                string path = LocalAssemblyFilePath;
-                string directory = Path.GetDirectoryName(path);
-                Directory.CreateDirectory(directory);
-                assemblyStream = File.Open(path, FileMode.Create, FileAccess.ReadWrite);
-
-                using (Task download = DownloadAssembly(assemblyStream))
+                using (Task download = DownloadAssemblyInternal(assemblyStream))
                 {
                     if (download.Wait(10000) && download.IsCompletedSuccessfully)
                     {
@@ -222,18 +235,18 @@ namespace ArcUpdater
             {
             }
 
-            assemblyStream?.Dispose();
+            assemblyStream.Dispose();
             return false;
         }
 
-        private async Task DownloadAssembly(Stream assemblyStream)
+        private async Task DownloadAssemblyInternal(Stream destination)
         {
             const string AssemblyUrl = "https://www.deltaconnected.com/arcdps/x64/d3d11.dll";
 
             using (HttpResponseMessage response = await _client.GetAsync(AssemblyUrl, HttpCompletionOption.ResponseHeadersRead))
             {
                 response.EnsureSuccessStatusCode();
-                await response.Content.CopyToAsync(assemblyStream);
+                await response.Content.CopyToAsync(destination);
             }
         }
     }

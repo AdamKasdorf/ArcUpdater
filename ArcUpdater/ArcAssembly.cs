@@ -80,11 +80,7 @@ namespace ArcUpdater
             using (MD5 md5 = MD5.Create())
             {
                 byte[] hash = md5.ComputeHash(_baseStream);
-#if NET5_0_OR_GREATER
                 return Convert.ToHexString(hash).ToLowerInvariant(); 
-#else
-                return BitConverter.ToString(hash).Replace("-", string.Empty).ToLowerInvariant();
-#endif
             }
         }
 

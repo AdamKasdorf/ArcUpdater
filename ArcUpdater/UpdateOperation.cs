@@ -2,6 +2,7 @@
 
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 
 namespace ArcUpdater
 {
@@ -52,14 +53,18 @@ namespace ArcUpdater
 
         public bool TargetDirectoryNotFound(FileSystemOperationState state)
         {
-            DirectoryInfo directory = Directory.CreateDirectory(state.FullPath);
-            
-            if (directory.Exists)
+            try
             {
-                return InstallToTargetDirectory(state);
+                Directory.CreateDirectory(state.FullPath);
+            }
+            catch
+            {
+                ConsoleHelper.WriteErrorLine("Could not create directories or subdirectories in path: " + state.FullPath);
+                ConsoleHelper.WriteErrorLine(SR.LocationWrite);
+                return false;
             }
 
-            return false;
+            return InstallToTargetDirectory(state);
         }
 
         public bool TargetFileFound(FileSystemOperationState state)
@@ -99,7 +104,8 @@ namespace ArcUpdater
                 return true;
             }
 
-            ConsoleHelper.WriteFileAccessError("Could not install assembly: " + state.FullPath);
+            ConsoleHelper.WriteErrorLine("Could not install assembly: " + state.FullPath);
+            ConsoleHelper.WriteError(SR.LocationWrite);
             return false;
         }
 
@@ -113,18 +119,22 @@ namespace ArcUpdater
                 return false;
             }
 
-            // Verifying currentness of file assembly.
-            // If current, returns true. If not found or outdated, proceeds to write.
+            // Verifying currentness and integrity of file.
+            // If current and not current, returns true. Otherwise, proceeds to write.
             // Returns false on thrown exceptions.
+
             string filePath = state.FullPath;
             bool couldVerify = false;
             bool isValid = false;
 
             try
             {
-                using FileStream stream = File.OpenRead(filePath);
-                using ArcAssembly assembly = new ArcAssembly(stream);
-                couldVerify = _verifier.TryVerify(assembly, out isValid);
+                FileStream stream = File.OpenRead(filePath);
+
+                using (ArcAssembly assembly = new ArcAssembly(stream))
+                {
+                    couldVerify = _verifier.TryVerify(assembly, out isValid);
+                }
             }
             catch
             {
@@ -132,7 +142,8 @@ namespace ArcUpdater
 
             if (!couldVerify)
             {
-                ConsoleHelper.WriteFileAccessError("Could not verify assembly: " + filePath);
+                ConsoleHelper.WriteErrorLine("Could not verify assembly: " + filePath);
+                ConsoleHelper.WriteErrorLine(SR.ExistingFileAccess);
                 return false;
             }
 
@@ -141,6 +152,9 @@ namespace ArcUpdater
                 Console.WriteLine("Assembly is current: " + filePath);
                 return true;
             }
+
+            // Assembly is determined to be outdated or corrupt.
+            // Ensures latest assembly is retrieved and updates file.
 
             if (!EnsureLatestAssemblyRetrieved())
             {
@@ -154,9 +168,10 @@ namespace ArcUpdater
                 return true;
             }
 
-            ConsoleHelper.WriteFileAccessError("Could not update asembly: " + filePath);
+            ConsoleHelper.WriteErrorLine("Could not update asembly: " + filePath);
+            ConsoleHelper.WriteErrorLine(SR.ExistingFileWrite);
             return false;
-        }
+        } 
 
         private bool WriteFile(string filePath, bool recycleOldFile)
         {
@@ -186,6 +201,8 @@ namespace ArcUpdater
         {
             // This method assumes _verifier has already downloaded the md55sum.
 
+            bool isValid;
+
             if (_updater.AssemblyRetrieved)
             {
                 return true;
@@ -193,33 +210,30 @@ namespace ArcUpdater
 
             if (_updater.TryLoadLocalAssemblyFile())
             {
-                if (_verifier.TryVerify(_updater.Assembly, out bool isValid) && isValid)
+                if (_verifier.TryVerify(_updater.Assembly, out isValid) && isValid)
                 {
                     return true;
                 }
             }
 
-            if (_updater.TryDownloadAssembly())
+            if (!_updater.TryDownloadAssembly())
             {
-                if (_verifier.TryVerify(_updater.Assembly, out bool isValid))
-                {
-                    if (isValid)
-                    {
-                        return true;
-                    }
-
-                    ConsoleHelper.WriteErrorLine("The downloaded assembly file is corrupt.");
-                }
-                else
-                {
-                    ConsoleHelper.WriteErrorLine("Could not verify the integrity of the downloaded assembly file.");
-                }
-            }
-            else
-            {
-                ConsoleHelper.WriteErrorLine("Could not download the assembly file.");
+                ConsoleHelper.WriteErrorLine("Could not download the assembly.");
+                return false;
             }
 
+            if (!_verifier.TryVerify(_updater.Assembly, out isValid))
+            {
+                ConsoleHelper.WriteErrorLine("Could not verify the integrity of the downloaded assembly.");
+                return false;
+            }
+
+            if (isValid)
+            {
+                return true;
+            }
+
+            ConsoleHelper.WriteErrorLine("The downloaded assembly is corrupt.");
             return false;
         }
     }

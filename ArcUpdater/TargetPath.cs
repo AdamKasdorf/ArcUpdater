@@ -91,8 +91,10 @@ namespace ArcUpdater
             }
 
             string fileName = Path.GetFileName(fullPath);
+            string extension = Path.GetExtension(fullPath);
 
-            if (fileName == string.Empty || Directory.Exists(fullPath))
+            if (fileName == string.Empty || Directory.Exists(fullPath) ||
+                (extension == string.Empty && !FileHelper.IsValidFileName(fileName + ".dll")))
             {
                 isDirectory = true;
 
@@ -104,7 +106,6 @@ namespace ArcUpdater
             else
             {
                 isDirectory = false;
-                string extension = Path.GetExtension(fullPath);
 
                 if (extension == string.Empty)
                 {

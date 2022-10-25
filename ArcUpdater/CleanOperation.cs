@@ -60,7 +60,8 @@ namespace ArcUpdater
                     return true;
                 }
 
-                ConsoleHelper.WriteFileAccessError("Could not delete file: " + filePath);
+                ConsoleHelper.WriteErrorLine("Could not delete file: " + filePath);
+                ConsoleHelper.WriteErrorLine(SR.ExistingFileWrite);
             }
             else
             {
@@ -70,7 +71,8 @@ namespace ArcUpdater
                     return true;
                 }
                 
-                ConsoleHelper.WriteFileAccessError("Could not move file to Recycle Bin: " + filePath);
+                ConsoleHelper.WriteErrorLine("Could not move file to Recycle Bin: " + filePath);
+                ConsoleHelper.WriteErrorLine(SR.ExistingFileWrite);
             }
 
             return false;

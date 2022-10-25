@@ -31,8 +31,8 @@ namespace ArcUpdater
 
         public bool TargetDirectoryEmpty(FileSystemOperationState state)
         {
-            Console.WriteLine("No appropriately-named assemblies found in directory: " + state.FullPath);
-            return true;
+            ConsoleHelper.WriteErrorLine("No appropriately-named assemblies found in directory: " + state.FullPath);
+            return false;
         }
 
         public bool TargetDirectoryFound(FileSystemOperationState state)
@@ -75,21 +75,23 @@ namespace ArcUpdater
 
             try
             {
-                using FileStream stream = File.OpenRead(filePath);
-                using ArcAssembly assembly = new ArcAssembly(stream);
+                FileStream stream = File.OpenRead(filePath);
 
-                if (_verifier.TryVerify(assembly, out bool isValid))
+                using (ArcAssembly assembly = new ArcAssembly(stream))
                 {
-                    if (isValid)
+                    if (_verifier.TryVerify(assembly, out bool isValid))
                     {
-                        Console.WriteLine("Assembly is current: " + filePath);
-                    }
-                    else
-                    {
-                        Console.WriteLine("Assembly is outdated or corrupt: " + filePath);
-                    }
+                        if (isValid)
+                        {
+                            Console.WriteLine("Assembly is current: " + filePath);
+                        }
+                        else
+                        {
+                            Console.WriteLine("Assembly is outdated or corrupt: " + filePath);
+                        }
 
-                    return true;
+                        return true;
+                    }
                 }
             }
             catch
@@ -97,7 +99,8 @@ namespace ArcUpdater
             }
 
             // TryVerify failed (returned false) or an exception was thrown.
-            ConsoleHelper.WriteFileAccessError("Could not verify assembly: " + filePath);
+            ConsoleHelper.WriteErrorLine("Could not verify assembly: " + filePath);
+            ConsoleHelper.WriteErrorLine(SR.ExistingFileAccess);
             return false;
         }
     }

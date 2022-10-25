@@ -17,11 +17,5 @@ namespace ArcUpdater.CommandLine
             Console.Write(value);
             Console.ForegroundColor = previousColor;
         }
-
-        public static void WriteFileAccessError(string accessError)
-        {
-            WriteErrorLine(accessError);
-            WriteErrorLine("Ensure you have permission to access this file and that it is not currently in use.");
-        }
     }
 }
