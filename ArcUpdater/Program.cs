@@ -31,8 +31,8 @@ namespace ArcUpdater
 
             UpdateOperation updateOperation = new UpdateOperation(verifier, updater, false);
             TargetPathOperation targetOperation = new TargetPathOperation(updateOperation, FileHelper.GetValidFilePaths);
-            bool success = targetOperation.Execute(TargetPath.CurrentDirectory);
 
+            bool success = targetOperation.Execute(TargetPath.CurrentDirectory);
             return ErrorCode.GetValue(success);
         }
     }
