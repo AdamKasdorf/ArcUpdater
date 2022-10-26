@@ -33,7 +33,7 @@ namespace ArcUpdater
             TargetPathOperation targetOperation = new TargetPathOperation(updateOperation, FileHelper.GetValidFilePaths);
 
             bool success = targetOperation.Execute(TargetPath.CurrentDirectory);
-            return ErrorCode.GetValue(success);
+            return ErrorCode.GetValue(success); 
         }
     }
 }
